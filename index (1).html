@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSCC Neural Kumamoto Model Synchronization Simulator</title>
+    
+    <!-- Sophisticated Animated Brain Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='fg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2300ffff'/%3E%3Cstop offset='50%25' stop-color='%23ff3366'/%3E%3Cstop offset='100%25' stop-color='%2300ffff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='url(%23fg)' stroke-width='1' opacity='0.3'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 32 32' to='360 32 32' dur='10s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%2300ffff' stroke-width='0.5' stroke-dasharray='3 3' opacity='0.4'%3E%3CanimateTransform attributeName='transform' type='rotate' from='360 32 32' to='0 32 32' dur='8s' repeatCount='indefinite'/%3E%3C/circle%3E%3Cpath d='M24 28c0-6 3.5-10 8-10s8 4 8 10c0 3-1.5 6-4 8 2 3 3 5.5 3 8 0 2.5-2 4-4 4s-3-1-4-2.5c-1 1.5-2 2.5-4 2.5s-4-1.5-4-4c0-2.5 1-5 3-8-2.5-2-4-5-4-8z' fill='none' stroke='%2300ffff' stroke-width='1.5'/%3E%3Ccircle cx='28' cy='26' r='2.5' fill='%2300ffff'%3E%3Canimate attributeName='opacity' values='1;0.3;1' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='36' cy='26' r='2.5' fill='%2300ffff'%3E%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='32' cy='34' r='3' fill='%23ff3366'%3E%3Canimate attributeName='r' values='2.5;3.5;2.5' dur='2s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-black: #000000;
+            --bg-dark: #050508;
+            --terminal-cyan: #00ffff;
+            --terminal-cyan-dim: #007a7a;
+            --terminal-cyan-glow: rgba(0, 255, 255, 0.4);
+            --accent-magenta: #ff3366;
+            --accent-magenta-dim: #99203d;
+            --warning-red: #ff3344;
+            --alert-yellow: #ffcc00;
+            --success-green: #00ff66;
+            --text-primary: #00ffff;
+            --text-dim: #006666;
+            --text-white: #ffffff;
+            --border-glow: 0 0 10px rgba(0, 255, 255, 0.5), 0 0 20px rgba(0, 255, 255, 0.2);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            font-family: 'IBM Plex Mono', 'Courier New', monospace;
+            background: var(--bg-black);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+        }
+        
+        /* ===== CRT EFFECTS ===== */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        
+        .crt-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+            animation: scanlines 0.1s linear infinite;
+        }
+        
+        .crt-overlay::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.3) 100%);
+        }
+        
+        @keyframes scanlines { 0% { background-position: 0 0; } 100% { background-position: 0 4px; } }
+        
+        .plus-grid {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M19 8v8h-8v2h8v8h2v-8h8v-2h-8V8h-2z' fill='%23007a7a' fill-opacity='0.12'/%3E%3C/svg%3E");
+            background-size: 40px 40px;
+        }
+        
+        /* ===== HEADER ===== */
+        header {
+            position: relative;
+            z-index: 10;
+            padding: 10px 24px;
+            border-bottom: 1px solid var(--terminal-cyan-dim);
+            background: linear-gradient(180deg, rgba(0,20,20,0.95) 0%, rgba(0,0,0,0.98) 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        /* ===== PREMIUM LOGO DESIGN ===== */
+        .logo-container {
+            position: relative;
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Outer rotating hexagonal frame */
+        .logo-hex-outer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            animation: hexRotate 30s linear infinite;
+        }
+        
+        .logo-hex-outer svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        @keyframes hexRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Inner counter-rotating elements */
+        .logo-hex-inner {
+            position: absolute;
+            width: 85%;
+            height: 85%;
+            animation: hexRotate 20s linear infinite reverse;
+        }
+        
+        .logo-hex-inner svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Core brain element */
+        .logo-core {
+            position: absolute;
+            width: 75%;
+            height: 75%;
+            z-index: 2;
+        }
+        
+        .logo-core svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6)) drop-shadow(0 0 15px rgba(255, 51, 102, 0.3));
+        }
+        
+        /* Pulsing glow effect */
+        .logo-glow {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.15) 0%, rgba(255, 51, 102, 0.08) 40%, transparent 70%);
+            animation: logoGlow 3s ease-in-out infinite;
+            z-index: 0;
+        }
+        
+        @keyframes logoGlow {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.15); }
+        }
+        
+        /* Orbital particles */
+        .logo-particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            animation: hexRotate 8s linear infinite;
+        }
+        
+        .logo-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--terminal-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 6px var(--terminal-cyan), 0 0 12px var(--terminal-cyan);
+        }
+        
+        .logo-particle:nth-child(1) { top: 0; left: 50%; transform: translateX(-50%); }
+        .logo-particle:nth-child(2) { bottom: 0; left: 50%; transform: translateX(-50%); background: var(--accent-magenta); box-shadow: 0 0 6px var(--accent-magenta); }
+        .logo-particle:nth-child(3) { top: 50%; left: 0; transform: translateY(-50%); }
+        .logo-particle:nth-child(4) { top: 50%; right: 0; transform: translateY(-50%); }
+        
+        /* Title styling */
+        .title-block {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        
+        .system-title {
+            font-family: 'Rajdhani', 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+        
+        .title-nscc {
+            background: linear-gradient(135deg, var(--terminal-cyan) 0%, var(--accent-magenta) 50%, var(--terminal-cyan) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 4s ease-in-out infinite;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .title-main {
+            color: var(--terminal-cyan);
+            text-shadow: 0 0 10px var(--terminal-cyan-glow);
+        }
+        
+        .system-subtitle {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .subtitle-divider {
+            width: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, var(--terminal-cyan), var(--accent-magenta));
+        }
+        
+        .system-version {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.1) 0%, rgba(255, 51, 102, 0.1) 100%);
+            border: 1px solid var(--terminal-cyan-dim);
+            font-size: 9px;
+            color: var(--terminal-cyan);
+            letter-spacing: 0.1em;
+        }
+        
+        .version-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--success-green);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .header-stats {
+            display: flex;
+            gap: 25px;
+            align-items: center;
+        }
+        
+        .stat-block {
+            text-align: right;
+            position: relative;
+            padding-left: 12px;
+        }
+        
+        .stat-block::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 24px;
+            background: linear-gradient(180deg, var(--terminal-cyan), var(--accent-magenta));
+            opacity: 0.5;
+        }
+        
+        .stat-label {
+            font-size: 8px;
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--terminal-cyan);
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border: 1px solid var(--success-green);
+            background: rgba(0, 255, 102, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 102, 0.1), transparent);
+            animation: statusSweep 3s ease-in-out infinite;
+        }
+        
+        @keyframes statusSweep {
+            0% { left: -100%; }
+            50%, 100% { left: 100%; }
+        }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success-green);
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 8px var(--success-green);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        .status-text {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--success-green);
+        }
+        
+        /* ===== MAIN LAYOUT ===== */
+        .main-container {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 1px;
+            background: var(--terminal-cyan-dim);
+            min-height: calc(100vh - 85px);
+        }
+        
+        .panel {
+            background: var(--bg-black);
+            position: relative;
+        }
+        
+        .panel-header {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--terminal-cyan-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 255, 255, 0.02);
+        }
+        
+        .panel-title {
+            font-size: 9px;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--terminal-cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: linear-gradient(135deg, var(--terminal-cyan) 0%, var(--accent-magenta) 100%);
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+        
+        .panel-id {
+            font-size: 8px;
+            color: var(--text-dim);
+            font-family: 'Space Mono', monospace;
+        }
+        
+        /* ===== CONTROLS PANEL ===== */
+        .controls-panel {
+            overflow-y: auto;
+            max-height: calc(100vh - 85px);
+        }
+        
+        .control-section {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .section-marker {
+            width: 3px;
+            height: 12px;
+            background: linear-gradient(180deg, var(--terminal-cyan), var(--accent-magenta));
+        }
+        
+        .section-title {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+        
+        .slider-group { margin-bottom: 18px; }
+        
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        
+        .slider-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-primary);
+        }
+        
+        .slider-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--terminal-cyan);
+            text-shadow: 0 0 10px var(--terminal-cyan-glow);
+        }
+        
+        .slider-track {
+            position: relative;
+            height: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 2px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, var(--terminal-cyan-dim), var(--accent-magenta-dim));
+            cursor: crosshair;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(135deg, var(--terminal-cyan), var(--accent-magenta));
+            border: 2px solid var(--bg-black);
+            cursor: crosshair;
+            box-shadow: 0 0 10px var(--terminal-cyan-glow);
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px var(--terminal-cyan-glow);
+        }
+        
+        .slider-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+        
+        .slider-markers span {
+            font-size: 8px;
+            color: var(--text-dim);
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .speed-control {
+            margin-top: 15px;
+            padding: 12px;
+            border: 1px solid var(--terminal-cyan-dim);
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.02) 0%, rgba(255, 51, 102, 0.02) 100%);
+        }
+        
+        .speed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .speed-label {
+            font-size: 9px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+        
+        .speed-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--alert-yellow);
+        }
+        
+        .speed-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        
+        .speed-btn {
+            padding: 8px 4px;
+            background: transparent;
+            border: 1px solid var(--terminal-cyan-dim);
+            color: var(--text-dim);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            cursor: crosshair;
+            transition: all 0.2s;
+        }
+        
+        .speed-btn:hover {
+            border-color: var(--terminal-cyan);
+            color: var(--terminal-cyan);
+        }
+        
+        .speed-btn.active {
+            border-color: var(--alert-yellow);
+            background: rgba(255, 204, 0, 0.1);
+            color: var(--alert-yellow);
+        }
+        
+        .freq-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        
+        .freq-btn {
+            padding: 12px 4px;
+            background: transparent;
+            border: 1px solid var(--terminal-cyan-dim);
+            color: var(--text-dim);
+            cursor: crosshair;
+            text-align: center;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .freq-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: transparent;
+            transition: background 0.2s;
+        }
+        
+        .freq-btn:hover {
+            border-color: var(--terminal-cyan);
+            color: var(--terminal-cyan);
+        }
+        
+        .freq-btn.active {
+            border-color: var(--terminal-cyan);
+            background: rgba(0, 255, 255, 0.05);
+            color: var(--terminal-cyan);
+        }
+        
+        .freq-btn.active::before {
+            background: linear-gradient(90deg, var(--terminal-cyan), var(--accent-magenta));
+        }
+        
+        .freq-symbol {
+            font-size: 16px;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .freq-range {
+            font-size: 7px;
+            letter-spacing: 0.05em;
+        }
+        
+        .freq-btn.delta .freq-symbol { color: #ff6666; }
+        .freq-btn.theta .freq-symbol { color: #ffaa44; }
+        .freq-btn.alpha .freq-symbol { color: #00ffff; }
+        .freq-btn.beta .freq-symbol { color: #ff66ff; }
+        .freq-btn.gamma .freq-symbol { color: #6666ff; }
+        
+        .network-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .network-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: transparent;
+            border: 1px solid rgba(0, 255, 255, 0.15);
+            color: var(--text-dim);
+            cursor: crosshair;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        
+        .network-btn:hover {
+            border-color: var(--terminal-cyan);
+            color: var(--terminal-cyan);
+        }
+        
+        .network-btn.active {
+            border-color: var(--accent-magenta);
+            border-left-width: 3px;
+            background: rgba(255, 51, 102, 0.05);
+        }
+        
+        .network-indicator {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .network-name {
+            flex: 1;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .network-count {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--terminal-cyan);
+        }
+        
+        .action-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .action-btn {
+            padding: 12px 15px;
+            background: transparent;
+            border: 1px solid var(--terminal-cyan);
+            color: var(--terminal-cyan);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: crosshair;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .action-btn:hover::before { left: 100%; }
+        
+        .action-btn:hover {
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: var(--border-glow);
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, var(--terminal-cyan), var(--accent-magenta));
+            color: var(--bg-black);
+            border: none;
+        }
+        
+        .action-btn.primary:hover {
+            filter: brightness(1.2);
+        }
+        
+        .action-btn.running {
+            background: var(--accent-magenta);
+            border-color: var(--accent-magenta);
+            color: var(--bg-black);
+        }
+        
+        /* ===== VISUALIZATION PANEL ===== */
+        .viz-panel {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .viz-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-black);
+            overflow: hidden;
+        }
+        
+        #brain-canvas {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+        }
+        
+        .viz-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border: 1px solid var(--terminal-cyan-dim);
+        }
+        
+        .corner-bracket {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--terminal-cyan);
+        }
+        
+        .corner-bracket.tl { top: 15px; left: 15px; border-right: none; border-bottom: none; }
+        .corner-bracket.tr { top: 15px; right: 15px; border-left: none; border-bottom: none; }
+        .corner-bracket.bl { bottom: 15px; left: 15px; border-right: none; border-top: none; }
+        .corner-bracket.br { bottom: 15px; right: 15px; border-left: none; border-top: none; }
+        
+        .reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            pointer-events: none;
+        }
+        
+        .reticle::before, .reticle::after {
+            content: '';
+            position: absolute;
+            background: var(--terminal-cyan);
+            opacity: 0.3;
+        }
+        
+        .reticle::before { width: 1px; height: 100%; left: 50%; }
+        .reticle::after { width: 100%; height: 1px; top: 50%; }
+        
+        .reticle-ring {
+            position: absolute;
+            inset: 20px;
+            border: 1px solid var(--terminal-cyan);
+            border-radius: 50%;
+            opacity: 0.2;
+        }
+        
+        .hud-label {
+            position: absolute;
+            font-size: 8px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--terminal-cyan);
+            opacity: 0.6;
+        }
+        
+        .hud-label.top-left { top: 50px; left: 50px; }
+        .hud-label.top-right { top: 50px; right: 50px; text-align: right; }
+        .hud-label.bottom-left { bottom: 50px; left: 50px; }
+        .hud-label.bottom-right { bottom: 50px; right: 50px; text-align: right; }
+        
+        .hud-value {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--terminal-cyan);
+            display: block;
+            margin-top: 2px;
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .viz-controls {
+            display: flex;
+            padding: 10px 15px;
+            gap: 8px;
+            border-top: 1px solid var(--terminal-cyan-dim);
+            background: rgba(0, 255, 255, 0.02);
+        }
+        
+        .view-btn {
+            padding: 8px 14px;
+            background: transparent;
+            border: 1px solid var(--terminal-cyan-dim);
+            color: var(--text-dim);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: crosshair;
+            transition: all 0.2s;
+        }
+        
+        .view-btn:hover {
+            border-color: var(--terminal-cyan);
+            color: var(--terminal-cyan);
+        }
+        
+        .view-btn.active {
+            background: linear-gradient(135deg, var(--terminal-cyan), var(--accent-magenta));
+            color: var(--bg-black);
+            border: none;
+        }
+        
+        /* ===== ANALYTICS PANEL ===== */
+        .analytics-panel {
+            overflow-y: auto;
+            max-height: calc(100vh - 85px);
+        }
+        
+        .order-display {
+            padding: 25px;
+            text-align: center;
+            border-bottom: 1px solid var(--terminal-cyan-dim);
+            position: relative;
+            background: linear-gradient(180deg, rgba(0, 255, 255, 0.03) 0%, transparent 100%);
+        }
+        
+        .order-label {
+            font-size: 8px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+        
+        .order-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 56px;
+            font-weight: 400;
+            background: linear-gradient(135deg, var(--terminal-cyan) 0%, var(--accent-magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 30px var(--terminal-cyan-glow);
+        }
+        
+        .order-bar {
+            margin-top: 15px;
+            height: 4px;
+            background: var(--terminal-cyan-dim);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .order-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--terminal-cyan), var(--accent-magenta));
+            box-shadow: 0 0 10px var(--terminal-cyan-glow);
+            transition: width 0.1s linear;
+        }
+        
+        .order-bar-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+        
+        .order-bar-markers span {
+            font-size: 8px;
+            color: var(--text-dim);
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .sync-status {
+            margin-top: 12px;
+            padding: 6px 15px;
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        
+        .sync-status.coherent {
+            border: 1px solid var(--success-green);
+            color: var(--success-green);
+            background: rgba(0, 255, 102, 0.05);
+        }
+        
+        .sync-status.partial {
+            border: 1px solid var(--alert-yellow);
+            color: var(--alert-yellow);
+            background: rgba(255, 204, 0, 0.05);
+        }
+        
+        .sync-status.incoherent {
+            border: 1px solid var(--accent-magenta);
+            color: var(--accent-magenta);
+            background: rgba(255, 51, 102, 0.05);
+        }
+        
+        .data-section {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 8px 0;
+            border-bottom: 1px dotted rgba(0, 255, 255, 0.1);
+        }
+        
+        .data-row:last-child { border-bottom: none; }
+        
+        .data-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+        }
+        
+        .data-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--terminal-cyan);
+        }
+        
+        .phase-section {
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .phase-ring-container {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        #phase-canvas { width: 100%; height: 100%; }
+        
+        .chart-section {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .chart-title {
+            font-size: 9px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+        
+        .chart-wrapper {
+            height: 80px;
+            position: relative;
+            background: rgba(0, 255, 255, 0.02);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        
+        .region-section { padding: 15px; }
+        
+        .region-header {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            margin-bottom: 10px;
+        }
+        
+        .region-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .region-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px dotted rgba(0, 255, 255, 0.05);
+        }
+        
+        .region-dot { width: 6px; height: 6px; }
+        
+        .region-name {
+            flex: 1;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+        }
+        
+        .region-freq {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            color: var(--text-dim);
+            width: 50px;
+            text-align: right;
+        }
+        
+        .region-bar {
+            width: 40px;
+            height: 3px;
+            background: var(--terminal-cyan-dim);
+            overflow: hidden;
+        }
+        
+        .region-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--terminal-cyan), var(--accent-magenta));
+            transition: width 0.1s;
+        }
+        
+        .source-info {
+            padding: 15px;
+            border-top: 1px solid var(--terminal-cyan-dim);
+            background: rgba(0, 255, 255, 0.02);
+        }
+        
+        .source-title {
+            font-size: 8px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+        
+        .source-item {
+            font-size: 8px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        
+        .source-item span { color: var(--terminal-cyan); }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg-black); }
+        ::-webkit-scrollbar-thumb { background: var(--terminal-cyan-dim); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--terminal-cyan); }
+        
+        /* ===== LOADING SCREEN ===== */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-black);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loading-logo-container {
+            width: 140px;
+            height: 140px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .loading-hex-outer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            animation: hexRotate 8s linear infinite;
+        }
+        
+        .loading-hex-inner {
+            position: absolute;
+            inset: 15%;
+            animation: hexRotate 6s linear infinite reverse;
+        }
+        
+        .loading-brain {
+            position: absolute;
+            inset: 20%;
+        }
+        
+        .loading-brain svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 15px rgba(0, 255, 255, 0.6)) drop-shadow(0 0 30px rgba(255, 51, 102, 0.4));
+        }
+        
+        .loading-pulse {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid var(--terminal-cyan);
+            opacity: 0;
+            animation: loadPulse 2s ease-out infinite;
+        }
+        
+        .loading-pulse:nth-child(2) { animation-delay: 0.5s; }
+        .loading-pulse:nth-child(3) { animation-delay: 1s; }
+        
+        @keyframes loadPulse {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        .loading-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            background: linear-gradient(135deg, var(--terminal-cyan) 0%, var(--accent-magenta) 50%, var(--terminal-cyan) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease-in-out infinite;
+            margin-bottom: 8px;
+        }
+        
+        .loading-subtitle {
+            font-size: 11px;
+            letter-spacing: 0.4em;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+        
+        .loading-bar {
+            width: 300px;
+            height: 2px;
+            background: var(--terminal-cyan-dim);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .loading-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--terminal-cyan), var(--accent-magenta), var(--terminal-cyan));
+            animation: loading 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes loading {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            font-size: 9px;
+            letter-spacing: 0.3em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1400px) {
+            .main-container { grid-template-columns: 260px 1fr 300px; }
+        }
+        
+        @media (max-width: 1100px) {
+            .main-container { grid-template-columns: 1fr; }
+            .controls-panel, .analytics-panel { max-height: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading">
+        <div class="loading-logo-container">
+            <div class="loading-pulse"></div>
+            <div class="loading-pulse"></div>
+            <div class="loading-pulse"></div>
+            
+            <div class="loading-hex-outer">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="url(#loadGrad)" stroke-width="1" opacity="0.6"/>
+                    <defs>
+                        <linearGradient id="loadGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#00ffff"/>
+                            <stop offset="50%" stop-color="#ff3366"/>
+                            <stop offset="100%" stop-color="#00ffff"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            
+            <div class="loading-hex-inner">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="none" stroke="#00ffff" stroke-width="0.5" stroke-dasharray="5 3" opacity="0.4"/>
+                </svg>
+            </div>
+            
+            <div class="loading-brain">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="2" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                    <g filter="url(#glow)">
+                        <path d="M35 42c0-10 6-16 15-16s15 6 15 16c0 5-2 10-6 13 2.5 4 4 8 4 12 0 4-2.5 6.5-6.5 6.5-2.5 0-5-1-6.5-3.5-1.5 2.5-4 3.5-6.5 3.5-4 0-6.5-2.5-6.5-6.5 0-4 1.5-8 4-12-4-3-6-8-6-13z" fill="none" stroke="#00ffff" stroke-width="2"/>
+                    </g>
+                    <circle cx="42" cy="38" r="5" fill="#00ffff"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle>
+                    <circle cx="58" cy="38" r="5" fill="#00ffff"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/></circle>
+                    <circle cx="50" cy="52" r="6" fill="#ff3366"><animate attributeName="r" values="5;7;5" dur="2s" repeatCount="indefinite"/></circle>
+                    <line x1="42" y1="38" x2="50" y2="52" stroke="#00ffff" stroke-width="1.5" opacity="0.7"/>
+                    <line x1="58" y1="38" x2="50" y2="52" stroke="#00ffff" stroke-width="1.5" opacity="0.7"/>
+                    <line x1="42" y1="38" x2="58" y2="38" stroke="#00ffff" stroke-width="1" opacity="0.4"/>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="loading-title">NSCC NEURAL KUMAMOTO</div>
+        <div class="loading-subtitle">Synchronization Simulator</div>
+        <div class="loading-bar"></div>
+        <div class="loading-text">Initializing Neural Topology...</div>
+    </div>
+
+    <!-- CRT Effects -->
+    <div class="crt-overlay"></div>
+    <div class="plus-grid"></div>
+
+    <!-- Header -->
+    <header>
+        <div class="logo-section">
+            <!-- Premium Redesigned Logo -->
+            <div class="logo-container">
+                <div class="logo-glow"></div>
+                
+                <!-- Outer hexagonal frame -->
+                <div class="logo-hex-outer">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#00ffff"/>
+                                <stop offset="50%" stop-color="#ff3366"/>
+                                <stop offset="100%" stop-color="#00ffff"/>
+                            </linearGradient>
+                        </defs>
+                        <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="url(#hexGrad)" stroke-width="1.5" opacity="0.5"/>
+                    </svg>
+                </div>
+                
+                <!-- Inner hexagonal frame -->
+                <div class="logo-hex-inner">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <polygon points="50,12 88,32 88,68 50,88 12,68 12,32" fill="none" stroke="#00ffff" stroke-width="0.5" stroke-dasharray="4 2" opacity="0.3"/>
+                    </svg>
+                </div>
+                
+                <!-- Orbital particles -->
+                <div class="logo-particles">
+                    <div class="logo-particle"></div>
+                    <div class="logo-particle"></div>
+                    <div class="logo-particle"></div>
+                    <div class="logo-particle"></div>
+                </div>
+                
+                <!-- Core brain design -->
+                <div class="logo-core">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#00ffff" stop-opacity="0.2"/>
+                                <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+                            </radialGradient>
+                            <filter id="brainGlow">
+                                <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+                        
+                        <circle cx="50" cy="50" r="40" fill="url(#coreGlow)"/>
+                        
+                        <!-- Brain outline -->
+                        <g filter="url(#brainGlow)">
+                            <path d="M35 42c0-10 6-16 15-16s15 6 15 16c0 5-2 10-6 13 2.5 4 4 8 4 12 0 4-2.5 6.5-6.5 6.5-2.5 0-5-1-6.5-3.5-1.5 2.5-4 3.5-6.5 3.5-4 0-6.5-2.5-6.5-6.5 0-4 1.5-8 4-12-4-3-6-8-6-13z" fill="none" stroke="#00ffff" stroke-width="1.5" stroke-linecap="round"/>
+                        </g>
+                        
+                        <!-- Neural nodes -->
+                        <circle cx="42" cy="38" r="4" fill="#00ffff">
+                            <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="58" cy="38" r="4" fill="#00ffff">
+                            <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="50" cy="50" r="5" fill="#ff3366">
+                            <animate attributeName="r" values="4;5.5;4" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="40" cy="62" r="3" fill="#00ffff" opacity="0.7"/>
+                        <circle cx="60" cy="62" r="3" fill="#00ffff" opacity="0.7"/>
+                        
+                        <!-- Synaptic connections -->
+                        <line x1="42" y1="38" x2="50" y2="50" stroke="#00ffff" stroke-width="1" opacity="0.7"/>
+                        <line x1="58" y1="38" x2="50" y2="50" stroke="#00ffff" stroke-width="1" opacity="0.7"/>
+                        <line x1="50" y1="50" x2="40" y2="62" stroke="#00ffff" stroke-width="0.75" opacity="0.5"/>
+                        <line x1="50" y1="50" x2="60" y2="62" stroke="#00ffff" stroke-width="0.75" opacity="0.5"/>
+                        <line x1="42" y1="38" x2="58" y2="38" stroke="#00ffff" stroke-width="0.5" opacity="0.3"/>
+                        
+                        <!-- Pulse ring -->
+                        <circle cx="50" cy="50" r="28" fill="none" stroke="#00ffff" stroke-width="0.5" opacity="0.2">
+                            <animate attributeName="r" values="26;32;26" dur="3s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="title-block">
+                <div class="system-title">
+                    <span class="title-nscc">NSCC</span>
+                    <span class="title-main">Neural Kumamoto Model</span>
+                </div>
+                <div class="system-subtitle">
+                    <span>Synchronization Simulator</span>
+                    <div class="subtitle-divider"></div>
+                    <span class="system-version">
+                        <span class="version-dot"></span>
+                        v1.5
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="header-stats">
+            <div class="stat-block">
+                <div class="stat-label">Nodes Active</div>
+                <div class="stat-value" id="node-count">66</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-label">Frequency</div>
+                <div class="stat-value" id="header-freq">10.0 Hz</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-label">Coupling (λ)</div>
+                <div class="stat-value" id="header-coupling">0.035</div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="status-text">System Online</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Controls Panel -->
+        <aside class="panel controls-panel">
+            <div class="panel-header">
+                <span class="panel-title">Parameters</span>
+                <span class="panel-id">SYS.001</span>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-header">
+                    <div class="section-marker"></div>
+                    <span class="section-title">Kumamoto Model</span>
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Coupling Strength (λ)</span>
+                        <span class="slider-value" id="k-value">0.035</span>
+                    </div>
+                    <div class="slider-track">
+                        <input type="range" id="k-slider" min="0" max="0.1" step="0.001" value="0.035">
+                    </div>
+                    <div class="slider-markers"><span>0.00</span><span>λc≈0.035</span><span>0.10</span></div>
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Frequency Spread (σ)</span>
+                        <span class="slider-value" id="sigma-value">1.5 Hz</span>
+                    </div>
+                    <div class="slider-track">
+                        <input type="range" id="sigma-slider" min="0.1" max="5" step="0.1" value="1.5">
+                    </div>
+                    <div class="slider-markers"><span>0.1</span><span>5.0</span></div>
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Noise Level</span>
+                        <span class="slider-value" id="noise-value">0.10</span>
+                    </div>
+                    <div class="slider-track">
+                        <input type="range" id="noise-slider" min="0" max="1" step="0.01" value="0.1">
+                    </div>
+                    <div class="slider-markers"><span>0.0</span><span>1.0</span></div>
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Time Step (dt)</span>
+                        <span class="slider-value" id="dt-value">0.010s</span>
+                    </div>
+                    <div class="slider-track">
+                        <input type="range" id="dt-slider" min="0.001" max="0.05" step="0.001" value="0.01">
+                    </div>
+                    <div class="slider-markers"><span>0.001</span><span>0.050</span></div>
+                </div>
+                
+                <div class="speed-control">
+                    <div class="speed-header">
+                        <span class="speed-label">Playback Speed</span>
+                        <span class="speed-value" id="speed-display">1.0×</span>
+                    </div>
+                    <div class="speed-buttons">
+                        <button class="speed-btn" data-speed="0.1">0.1×</button>
+                        <button class="speed-btn" data-speed="0.25">0.25×</button>
+                        <button class="speed-btn" data-speed="0.5">0.5×</button>
+                        <button class="speed-btn active" data-speed="1">1×</button>
+                        <button class="speed-btn" data-speed="2">2×</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-header">
+                    <div class="section-marker"></div>
+                    <span class="section-title">EEG Frequency Band</span>
+                </div>
+                
+                <div class="freq-grid">
+                    <button class="freq-btn delta" data-freq="2" data-sigma="1"><span class="freq-symbol">δ</span><span class="freq-range">0.5-4Hz</span></button>
+                    <button class="freq-btn theta" data-freq="6" data-sigma="1.5"><span class="freq-symbol">θ</span><span class="freq-range">4-8Hz</span></button>
+                    <button class="freq-btn alpha active" data-freq="10" data-sigma="1.5"><span class="freq-symbol">α</span><span class="freq-range">8-13Hz</span></button>
+                    <button class="freq-btn beta" data-freq="20" data-sigma="4"><span class="freq-symbol">β</span><span class="freq-range">13-30Hz</span></button>
+                    <button class="freq-btn gamma" data-freq="45" data-sigma="10"><span class="freq-symbol">γ</span><span class="freq-range">30-80Hz</span></button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-header">
+                    <div class="section-marker"></div>
+                    <span class="section-title">Functional Networks</span>
+                </div>
+                
+                <div class="network-list">
+                    <button class="network-btn active" data-network="all">
+                        <div class="network-indicator" style="background: linear-gradient(135deg, #00ffff, #ff3366)"></div>
+                        <span class="network-name">All Networks</span>
+                        <span class="network-count">66</span>
+                    </button>
+                    <button class="network-btn" data-network="dmn">
+                        <div class="network-indicator" style="background: #ff6666"></div>
+                        <span class="network-name">Default Mode</span>
+                        <span class="network-count">11</span>
+                    </button>
+                    <button class="network-btn" data-network="visual">
+                        <div class="network-indicator" style="background: #00ccff"></div>
+                        <span class="network-name">Visual</span>
+                        <span class="network-count">10</span>
+                    </button>
+                    <button class="network-btn" data-network="motor">
+                        <div class="network-indicator" style="background: #ff66ff"></div>
+                        <span class="network-name">Sensorimotor</span>
+                        <span class="network-count">12</span>
+                    </button>
+                    <button class="network-btn" data-network="attention">
+                        <div class="network-indicator" style="background: #ffaa44"></div>
+                        <span class="network-name">Attention/Salience</span>
+                        <span class="network-count">8</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="action-group">
+                    <button class="action-btn primary" id="btn-start">▶ Execute</button>
+                    <button class="action-btn" id="btn-reset">↺ Reset</button>
+                </div>
+            </div>
+            
+            <div class="source-info">
+                <div class="source-title">Data Sources</div>
+                <div class="source-item">• <span>Schmidt et al. 2015</span> - BMC Neuroscience</div>
+                <div class="source-item">• Coupling range: <span>λ = 0.02–0.05</span></div>
+                <div class="source-item">• Critical threshold: <span>λc ≈ 0.035</span></div>
+                <div class="source-item">• <span>Human Connectome Project</span> parcellation</div>
+            </div>
+        </aside>
+
+        <!-- Visualization Panel -->
+        <section class="panel viz-panel">
+            <div class="panel-header">
+                <span class="panel-title">3D Connectome</span>
+                <span class="panel-id"><span id="fps-display">60</span> FPS</span>
+            </div>
+            
+            <div class="viz-container">
+                <canvas id="brain-canvas"></canvas>
+                <div class="viz-overlay">
+                    <div class="corner-bracket tl"></div>
+                    <div class="corner-bracket tr"></div>
+                    <div class="corner-bracket bl"></div>
+                    <div class="corner-bracket br"></div>
+                    <div class="reticle"><div class="reticle-ring"></div></div>
+                    <div class="hud-label top-left">Est. Relative<br><span class="hud-value" id="hud-network">ALL NETWORKS</span></div>
+                    <div class="hud-label top-right">Speed<br><span class="hud-value" id="hud-speed">1.0×</span></div>
+                    <div class="hud-label bottom-left">Time<br><span class="hud-value" id="hud-time">0.00s</span></div>
+                    <div class="hud-label bottom-right">Order<br><span class="hud-value" id="hud-order">r: 0.00</span></div>
+                </div>
+            </div>
+            
+            <div class="viz-controls">
+                <button class="view-btn active" id="view-3d">3D</button>
+                <button class="view-btn" id="view-top">Top</button>
+                <button class="view-btn" id="view-side">Side</button>
+                <button class="view-btn" id="view-front">Front</button>
+                <button class="view-btn" id="toggle-conn">Conn</button>
+                <button class="view-btn" id="toggle-glitch">Glitch</button>
+            </div>
+        </section>
+
+        <!-- Analytics Panel -->
+        <aside class="panel analytics-panel">
+            <div class="panel-header">
+                <span class="panel-title">Analytics</span>
+                <span class="panel-id">SYS.002</span>
+            </div>
+            
+            <div class="order-display">
+                <div class="order-label">Order Parameter (r)</div>
+                <div class="order-value" id="order-value">0.00</div>
+                <div class="order-bar"><div class="order-bar-fill" id="order-bar" style="width: 0%"></div></div>
+                <div class="order-bar-markers"><span>0.0</span><span>0.5</span><span>1.0</span></div>
+                <div class="sync-status incoherent" id="sync-status">Incoherent</div>
+            </div>
+            
+            <div class="data-section">
+                <div class="section-header">
+                    <div class="section-marker"></div>
+                    <span class="section-title">System Metrics</span>
+                </div>
+                <div class="data-row"><span class="data-label">Mean Frequency</span><span class="data-value" id="mean-freq">10.00 Hz</span></div>
+                <div class="data-row"><span class="data-label">Coherence</span><span class="data-value" id="coherence">0.00</span></div>
+                <div class="data-row"><span class="data-label">Sync Clusters</span><span class="data-value" id="clusters">1</span></div>
+                <div class="data-row"><span class="data-label">Simulation Time</span><span class="data-value" id="sim-time">0.00s</span></div>
+            </div>
+            
+            <div class="phase-section">
+                <div class="section-header" style="justify-content: center;"><span class="section-title">Phase Distribution</span></div>
+                <div class="phase-ring-container"><canvas id="phase-canvas"></canvas></div>
+            </div>
+            
+            <div class="chart-section">
+                <div class="chart-header"><span class="chart-title">Order History</span></div>
+                <div class="chart-wrapper"><canvas id="history-canvas"></canvas></div>
+            </div>
+            
+            <div class="region-section">
+                <div class="region-header">
+                    <span class="section-title">Active Regions</span>
+                    <span class="panel-id" id="region-count">15/66</span>
+                </div>
+                <div class="region-list" id="region-list"></div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+    // NSCC Neural Kumamoto Model Synchronization Simulator v1.5
+    const BRAIN_REGIONS = [
+        {name:"PCC",x:0,y:-53,z:26,network:"dmn"},{name:"mPFC",x:0,y:52,z:-6,network:"dmn"},{name:"L-LPC",x:-48,y:-62,z:36,network:"dmn"},{name:"R-LPC",x:48,y:-67,z:36,network:"dmn"},{name:"L-PHG",x:-24,y:-33,z:-18,network:"dmn"},{name:"R-PHG",x:24,y:-33,z:-18,network:"dmn"},{name:"L-TPJ",x:-54,y:-54,z:28,network:"dmn"},{name:"R-TPJ",x:54,y:-54,z:28,network:"dmn"},{name:"dmPFC",x:-3,y:55,z:22,network:"dmn"},{name:"vmPFC",x:-3,y:59,z:-7,network:"dmn"},{name:"Precuneus",x:0,y:-60,z:40,network:"dmn"},
+        {name:"L-V1",x:-8,y:-88,z:0,network:"visual"},{name:"R-V1",x:8,y:-88,z:0,network:"visual"},{name:"L-V2",x:-18,y:-95,z:8,network:"visual"},{name:"R-V2",x:18,y:-95,z:8,network:"visual"},{name:"L-V3",x:-25,y:-90,z:12,network:"visual"},{name:"R-V3",x:25,y:-90,z:12,network:"visual"},{name:"L-V4",x:-30,y:-80,z:-10,network:"visual"},{name:"R-V4",x:30,y:-80,z:-10,network:"visual"},{name:"L-MT",x:-45,y:-75,z:5,network:"visual"},{name:"R-MT",x:45,y:-75,z:5,network:"visual"},
+        {name:"L-M1",x:-38,y:-20,z:55,network:"motor"},{name:"R-M1",x:38,y:-20,z:55,network:"motor"},{name:"L-S1",x:-42,y:-28,z:52,network:"motor"},{name:"R-S1",x:42,y:-28,z:52,network:"motor"},{name:"L-PMC",x:-30,y:-8,z:58,network:"motor"},{name:"R-PMC",x:30,y:-8,z:58,network:"motor"},{name:"SMA",x:0,y:-5,z:62,network:"motor"},{name:"L-SPL",x:-28,y:-48,z:58,network:"motor"},{name:"R-SPL",x:28,y:-48,z:58,network:"motor"},{name:"L-Cereb",x:-25,y:-55,z:-30,network:"motor"},{name:"R-Cereb",x:25,y:-55,z:-30,network:"motor"},{name:"Vermis",x:0,y:-60,z:-25,network:"motor"},
+        {name:"L-FEF",x:-30,y:-2,z:52,network:"attention"},{name:"R-FEF",x:30,y:-2,z:52,network:"attention"},{name:"L-IPS",x:-28,y:-58,z:48,network:"attention"},{name:"R-IPS",x:28,y:-58,z:48,network:"attention"},{name:"L-AI",x:-35,y:18,z:5,network:"attention"},{name:"R-AI",x:35,y:18,z:5,network:"attention"},{name:"dACC",x:0,y:20,z:40,network:"attention"},{name:"preSMA",x:0,y:10,z:55,network:"attention"},
+        {name:"L-DLPFC",x:-42,y:35,z:28,network:"frontal"},{name:"R-DLPFC",x:42,y:35,z:28,network:"frontal"},{name:"L-VLPFC",x:-45,y:28,z:8,network:"frontal"},{name:"R-VLPFC",x:45,y:28,z:8,network:"frontal"},{name:"L-OFC",x:-25,y:40,z:-15,network:"frontal"},{name:"R-OFC",x:25,y:40,z:-15,network:"frontal"},{name:"L-IFG",x:-50,y:20,z:10,network:"frontal"},{name:"R-IFG",x:50,y:20,z:10,network:"frontal"},
+        {name:"L-STG",x:-55,y:-15,z:5,network:"temporal"},{name:"R-STG",x:55,y:-15,z:5,network:"temporal"},{name:"L-MTG",x:-58,y:-30,z:-5,network:"temporal"},{name:"R-MTG",x:58,y:-30,z:-5,network:"temporal"},{name:"L-ITG",x:-55,y:-45,z:-15,network:"temporal"},{name:"R-ITG",x:55,y:-45,z:-15,network:"temporal"},{name:"L-Hipp",x:-25,y:-20,z:-12,network:"temporal"},{name:"R-Hipp",x:25,y:-20,z:-12,network:"temporal"},
+        {name:"L-Thal",x:-10,y:-18,z:8,network:"subcortical"},{name:"R-Thal",x:10,y:-18,z:8,network:"subcortical"},{name:"L-Caud",x:-12,y:10,z:10,network:"subcortical"},{name:"R-Caud",x:12,y:10,z:10,network:"subcortical"},{name:"L-Put",x:-25,y:5,z:0,network:"subcortical"},{name:"R-Put",x:25,y:5,z:0,network:"subcortical"},{name:"L-Amyg",x:-22,y:-5,z:-18,network:"subcortical"},{name:"R-Amyg",x:22,y:-5,z:-18,network:"subcortical"},{name:"Brainstem",x:0,y:-30,z:-35,network:"subcortical"}
+    ];
+    const NETWORK_COLORS={dmn:0xff6666,visual:0x00ccff,motor:0xff66ff,attention:0xffaa44,frontal:0x6699ff,temporal:0xcc66ff,subcortical:0x00ffcc};
+
+    class KuramotoModel{constructor(r){this.regions=r;this.N=r.length;this.phases=new Float64Array(this.N);this.naturalFrequencies=new Float64Array(this.N);this.couplingMatrix=this.buildCouplingMatrix();this.K=0.035;this.meanFreq=10;this.sigma=1.5;this.dt=0.01;this.noiseLevel=0.1;this.time=0;this.orderHistory=[];this.maxHistory=150;this.reset()}buildCouplingMatrix(){const m=[];for(let i=0;i<this.N;i++){m[i]=[];for(let j=0;j<this.N;j++){if(i===j){m[i][j]=0}else{const ri=this.regions[i],rj=this.regions[j];const d=Math.sqrt(Math.pow(ri.x-rj.x,2)+Math.pow(ri.y-rj.y,2)+Math.pow(ri.z-rj.z,2));const nb=ri.network===rj.network?2:1;m[i][j]=nb/(1+d/30)}}const s=m[i].reduce((a,b)=>a+b,0);if(s>0)for(let j=0;j<this.N;j++)m[i][j]/=s}return m}reset(){for(let i=0;i<this.N;i++)this.phases[i]=Math.random()*2*Math.PI;this.initializeFrequencies();this.time=0;this.orderHistory=[]}initializeFrequencies(){for(let i=0;i<this.N;i++){const u1=Math.random(),u2=Math.random();const z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);this.naturalFrequencies[i]=this.meanFreq+this.sigma*z}}setParameters(p){if(p.K!==undefined)this.K=p.K;if(p.meanFreq!==undefined){this.meanFreq=p.meanFreq;this.initializeFrequencies()}if(p.sigma!==undefined){this.sigma=p.sigma;this.initializeFrequencies()}if(p.dt!==undefined)this.dt=p.dt;if(p.noiseLevel!==undefined)this.noiseLevel=p.noiseLevel}step(){const np=new Float64Array(this.N);for(let i=0;i<this.N;i++){let c=0;for(let j=0;j<this.N;j++)c+=this.couplingMatrix[i][j]*Math.sin(this.phases[j]-this.phases[i]);const n=this.noiseLevel*(Math.random()-0.5)*2;const o=2*Math.PI*this.naturalFrequencies[i];const dT=o+this.K*this.N*c+n;np[i]=this.phases[i]+dT*this.dt;np[i]=((np[i]%(2*Math.PI))+2*Math.PI)%(2*Math.PI)}this.phases=np;this.time+=this.dt;const r=this.calculateOrderParameter();this.orderHistory.push(r);if(this.orderHistory.length>this.maxHistory)this.orderHistory.shift();return r}calculateOrderParameter(){let re=0,im=0;for(let i=0;i<this.N;i++){re+=Math.cos(this.phases[i]);im+=Math.sin(this.phases[i])}re/=this.N;im/=this.N;return Math.sqrt(re*re+im*im)}getMeanPhase(){let re=0,im=0;for(let i=0;i<this.N;i++){re+=Math.cos(this.phases[i]);im+=Math.sin(this.phases[i])}return Math.atan2(im,re)}countSyncClusters(t=0.5){const cl=[];const as=new Array(this.N).fill(false);for(let i=0;i<this.N;i++){if(as[i])continue;const c=[i];as[i]=true;for(let j=i+1;j<this.N;j++){if(as[j])continue;const pd=Math.abs(this.phases[i]-this.phases[j]);const md=Math.min(pd,2*Math.PI-pd);if(md<t){c.push(j);as[j]=true}}if(c.length>1)cl.push(c)}return Math.max(1,cl.length)}}
+
+    class BrainVisualization{constructor(c,m){this.canvas=c;this.model=m;this.showConnections=true;this.glitchEnabled=false;this.activeNetwork='all';this.init()}init(){this.scene=new THREE.Scene();const a=this.canvas.clientWidth/this.canvas.clientHeight;this.camera=new THREE.PerspectiveCamera(50,a,0.1,1000);this.camera.position.set(0,0,220);this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,antialias:true,alpha:true});this.renderer.setSize(this.canvas.clientWidth,this.canvas.clientHeight);this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));this.renderer.setClearColor(0x000000,1);const al=new THREE.AmbientLight(0x00ffff,0.2);this.scene.add(al);const dl=new THREE.DirectionalLight(0x00ffff,0.5);dl.position.set(100,100,100);this.scene.add(dl);const bl=new THREE.DirectionalLight(0xff3366,0.3);bl.position.set(-100,-50,-100);this.scene.add(bl);this.createBrainOutline();this.createRegionNodes();this.createConnections();this.setupControls();window.addEventListener('resize',()=>this.onResize())}createBrainOutline(){const g=new THREE.IcosahedronGeometry(75,2);g.scale(1,0.85,0.95);const wm=new THREE.MeshBasicMaterial({color:0x00ffff,transparent:true,opacity:0.03,wireframe:true});this.brainWireframe=new THREE.Mesh(g,wm);this.scene.add(this.brainWireframe);const gg=new THREE.SphereGeometry(80,32,32);gg.scale(1,0.85,0.95);const gm=new THREE.MeshBasicMaterial({color:0x00ffff,transparent:true,opacity:0.02,side:THREE.BackSide});this.brainGlow=new THREE.Mesh(gg,gm);this.scene.add(this.brainGlow)}createRegionNodes(){this.nodes=[];this.nodeGroup=new THREE.Group();const sc=0.75;for(let i=0;i<this.model.regions.length;i++){const r=this.model.regions[i];const g=new THREE.OctahedronGeometry(2.5,0);const c=NETWORK_COLORS[r.network]||0x00ffff;const m=new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0.9});const n=new THREE.Mesh(g,m);n.position.set(r.x*sc,r.z*sc,-r.y*sc);n.userData={index:i,region:r,baseColor:c};const rg=new THREE.RingGeometry(4,4.5,16);const rm=new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0.3,side:THREE.DoubleSide});const ri=new THREE.Mesh(rg,rm);ri.position.copy(n.position);this.nodes.push({node:n,ring:ri});this.nodeGroup.add(n);this.nodeGroup.add(ri)}this.scene.add(this.nodeGroup)}createConnections(){this.connectionGroup=new THREE.Group();this.connections=[];for(let i=0;i<this.model.N;i++){for(let j=i+1;j<this.model.N;j++){const cp=this.model.couplingMatrix[i][j];if(cp>0.04){const g=new THREE.BufferGeometry();const p=new Float32Array(6);const p1=this.nodes[i].node.position;const p2=this.nodes[j].node.position;p[0]=p1.x;p[1]=p1.y;p[2]=p1.z;p[3]=p2.x;p[4]=p2.y;p[5]=p2.z;g.setAttribute('position',new THREE.BufferAttribute(p,3));const m=new THREE.LineBasicMaterial({color:0x00ffff,transparent:true,opacity:cp*0.3});const l=new THREE.Line(g,m);l.userData={i,j,baseCoupling:cp};this.connections.push(l);this.connectionGroup.add(l)}}}this.scene.add(this.connectionGroup)}setupControls(){let d=false;let pm={x:0,y:0};this.canvas.addEventListener('mousedown',e=>{d=true;pm={x:e.clientX,y:e.clientY}});this.canvas.addEventListener('mousemove',e=>{if(!d)return;const dx=e.clientX-pm.x;const dy=e.clientY-pm.y;this.nodeGroup.rotation.y+=dx*0.005;this.nodeGroup.rotation.x+=dy*0.005;this.connectionGroup.rotation.y+=dx*0.005;this.connectionGroup.rotation.x+=dy*0.005;this.brainWireframe.rotation.y+=dx*0.005;this.brainWireframe.rotation.x+=dy*0.005;pm={x:e.clientX,y:e.clientY}});this.canvas.addEventListener('mouseup',()=>d=false);this.canvas.addEventListener('mouseleave',()=>d=false);this.canvas.addEventListener('wheel',e=>{e.preventDefault();this.camera.position.z+=e.deltaY*0.1;this.camera.position.z=Math.max(120,Math.min(400,this.camera.position.z))})}setView(v){const d=500;const tr={x:0,y:0};switch(v){case'top':tr.x=-Math.PI/2;break;case'side':tr.y=Math.PI/2;break;case'front':tr.x=0;tr.y=0;break}const sr={x:this.nodeGroup.rotation.x,y:this.nodeGroup.rotation.y};const st=performance.now();const an=()=>{const el=performance.now()-st;const pr=Math.min(el/d,1);const ea=1-Math.pow(1-pr,3);this.nodeGroup.rotation.x=sr.x+(tr.x-sr.x)*ea;this.nodeGroup.rotation.y=sr.y+(tr.y-sr.y)*ea;this.connectionGroup.rotation.x=this.nodeGroup.rotation.x;this.connectionGroup.rotation.y=this.nodeGroup.rotation.y;this.brainWireframe.rotation.x=this.nodeGroup.rotation.x;this.brainWireframe.rotation.y=this.nodeGroup.rotation.y;if(pr<1)requestAnimationFrame(an)};an()}setNetwork(n){this.activeNetwork=n;for(let i=0;i<this.nodes.length;i++){const{node:nd,ring:rn}=this.nodes[i];const rg=nd.userData.region;if(n==='all'||rg.network===n){nd.material.opacity=0.9;nd.scale.setScalar(1);rn.material.opacity=0.3}else{nd.material.opacity=0.15;nd.scale.setScalar(0.5);rn.material.opacity=0.05}}for(const cn of this.connections){const ri=this.model.regions[cn.userData.i];const rj=this.model.regions[cn.userData.j];if(n==='all'||(ri.network===n&&rj.network===n)){cn.material.opacity=cn.userData.baseCoupling*0.3}else{cn.material.opacity=0.02}}}update(){const t=performance.now()*0.001;for(let i=0;i<this.nodes.length;i++){const{node:n,ring:r}=this.nodes[i];const ph=this.model.phases[i];const it=(Math.sin(ph)+1)/2;const ps=1+it*0.4;const ia=this.activeNetwork==='all'||n.userData.region.network===this.activeNetwork;n.scale.setScalar(ps*(ia?1:0.5));r.rotation.x=t+i*0.1;r.rotation.y=t*0.5;if(it>0.7)n.material.color.setHex(0xffffff);else n.material.color.setHex(n.userData.baseColor)}if(this.showConnections){for(const cn of this.connections){const pd=Math.abs(this.model.phases[cn.userData.i]-this.model.phases[cn.userData.j]);const sy=Math.cos(pd);if(sy>0.5){cn.material.color.setHex(0x00ffff);cn.material.opacity=Math.min(sy*0.5,0.5)}else{cn.material.color.setHex(0x003333);cn.material.opacity=0.03}}}if(this.glitchEnabled&&Math.random()>0.95){this.nodeGroup.position.x=(Math.random()-0.5)*5;setTimeout(()=>this.nodeGroup.position.x=0,50)}this.brainWireframe.rotation.y+=0.001;this.brainGlow.rotation.y-=0.0005;this.renderer.render(this.scene,this.camera)}toggleConnections(s){this.showConnections=s;this.connectionGroup.visible=s}toggleGlitch(e){this.glitchEnabled=e}onResize(){const w=this.canvas.clientWidth;const h=this.canvas.clientHeight;this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(w,h)}}
+
+    class Analytics{constructor(m){this.model=m;this.setupPhaseCanvas();this.setupHistoryCanvas()}setupPhaseCanvas(){this.phaseCanvas=document.getElementById('phase-canvas');this.phaseCtx=this.phaseCanvas.getContext('2d');const s=160;this.phaseCanvas.width=s*2;this.phaseCanvas.height=s*2;this.phaseCanvas.style.width=s+'px';this.phaseCanvas.style.height=s+'px'}setupHistoryCanvas(){this.historyCanvas=document.getElementById('history-canvas');this.historyCtx=this.historyCanvas.getContext('2d');const r=this.historyCanvas.parentElement.getBoundingClientRect();this.historyCanvas.width=r.width*2;this.historyCanvas.height=r.height*2;this.historyCanvas.style.width='100%';this.historyCanvas.style.height='100%'}update(){const r=this.model.calculateOrderParameter();document.getElementById('order-value').textContent=r.toFixed(2);document.getElementById('order-bar').style.width=(r*100)+'%';const st=document.getElementById('sync-status');if(r>0.7){st.textContent='Coherent';st.className='sync-status coherent'}else if(r>0.3){st.textContent='Partial Sync';st.className='sync-status partial'}else{st.textContent='Incoherent';st.className='sync-status incoherent'}document.getElementById('mean-freq').textContent=this.model.meanFreq.toFixed(2)+' Hz';document.getElementById('coherence').textContent=r.toFixed(3);document.getElementById('clusters').textContent=this.model.countSyncClusters();document.getElementById('sim-time').textContent=this.model.time.toFixed(2)+'s';document.getElementById('hud-time').textContent=this.model.time.toFixed(2)+'s';document.getElementById('hud-order').textContent='r: '+r.toFixed(2);this.drawPhaseDistribution();this.drawHistoryChart()}drawPhaseDistribution(){const c=this.phaseCtx;const s=this.phaseCanvas.width;const ct=s/2;const rd=s/2-30;c.clearRect(0,0,s,s);c.strokeStyle='rgba(0,255,255,0.1)';c.lineWidth=1;for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;c.beginPath();c.moveTo(ct,ct);c.lineTo(ct+rd*Math.cos(a),ct+rd*Math.sin(a));c.stroke()}c.strokeStyle='rgba(0,255,255,0.3)';c.lineWidth=2;c.beginPath();c.arc(ct,ct,rd,0,2*Math.PI);c.stroke();c.strokeStyle='rgba(0,255,255,0.1)';c.lineWidth=1;c.beginPath();c.arc(ct,ct,rd*0.66,0,2*Math.PI);c.stroke();c.beginPath();c.arc(ct,ct,rd*0.33,0,2*Math.PI);c.stroke();for(let i=0;i<this.model.N;i++){const ph=this.model.phases[i];const x=ct+rd*Math.cos(ph-Math.PI/2);const y=ct+rd*Math.sin(ph-Math.PI/2);const rg=this.model.regions[i];const cl=NETWORK_COLORS[rg.network]||0x00ffff;const cs='#'+cl.toString(16).padStart(6,'0');c.fillStyle=cs;c.shadowColor=cs;c.shadowBlur=8;c.beginPath();c.arc(x,y,4,0,2*Math.PI);c.fill();c.shadowBlur=0}const mp=this.model.getMeanPhase();const r=this.model.calculateOrderParameter();const al=rd*r;c.strokeStyle='#00ffff';c.lineWidth=3;c.shadowColor='#00ffff';c.shadowBlur=10;c.beginPath();c.moveTo(ct,ct);c.lineTo(ct+al*Math.cos(mp-Math.PI/2),ct+al*Math.sin(mp-Math.PI/2));c.stroke();c.shadowBlur=0;const ex=ct+al*Math.cos(mp-Math.PI/2);const ey=ct+al*Math.sin(mp-Math.PI/2);const ha=0.4;const hl=12;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-hl*Math.cos(mp-Math.PI/2-ha),ey-hl*Math.sin(mp-Math.PI/2-ha));c.moveTo(ex,ey);c.lineTo(ex-hl*Math.cos(mp-Math.PI/2+ha),ey-hl*Math.sin(mp-Math.PI/2+ha));c.stroke()}drawHistoryChart(){const c=this.historyCtx;const w=this.historyCanvas.width;const h=this.historyCanvas.height;const hs=this.model.orderHistory;c.clearRect(0,0,w,h);if(hs.length<2)return;c.strokeStyle='rgba(0,255,255,0.1)';c.lineWidth=1;for(let i=0;i<=4;i++){const y=(i/4)*h;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke()}c.strokeStyle='#00ffff';c.lineWidth=2;c.shadowColor='#00ffff';c.shadowBlur=5;c.beginPath();for(let i=0;i<hs.length;i++){const x=(i/(this.model.maxHistory-1))*w;const y=h-hs[i]*h;if(i===0)c.moveTo(x,y);else c.lineTo(x,y)}c.stroke();c.shadowBlur=0;c.fillStyle='rgba(0,255,255,0.1)';c.lineTo(w,h);c.lineTo(0,h);c.closePath();c.fill()}updateRegionList(){const l=document.getElementById('region-list');l.innerHTML='';const si=[...Array(this.model.N).keys()].sort((a,b)=>this.model.regions[a].network.localeCompare(this.model.regions[b].network));for(let i=0;i<Math.min(15,si.length);i++){const ix=si[i];const rg=this.model.regions[ix];const ph=this.model.phases[ix];const fr=this.model.naturalFrequencies[ix];const cl=NETWORK_COLORS[rg.network]||0x00ffff;const it=document.createElement('div');it.className='region-item';it.innerHTML=`<div class="region-dot" style="background:#${cl.toString(16).padStart(6,'0')}"></div><span class="region-name">${rg.name}</span><span class="region-freq">${fr.toFixed(1)}Hz</span><div class="region-bar"><div class="region-bar-fill" style="width:${((ph/(2*Math.PI))*100).toFixed(0)}%"></div></div>`;l.appendChild(it)}}}
+
+    class App{constructor(){this.isRunning=false;this.frameCount=0;this.lastFpsUpdate=performance.now();this.playbackSpeed=1;this.stepsPerFrame=5;this.model=new KuramotoModel(BRAIN_REGIONS);const cv=document.getElementById('brain-canvas');this.visualization=new BrainVisualization(cv,this.model);this.analytics=new Analytics(this.model);this.setupControls();this.analytics.updateRegionList();setTimeout(()=>document.getElementById('loading').classList.add('hidden'),2500);this.render()}setupControls(){const ks=document.getElementById('k-slider');const ss=document.getElementById('sigma-slider');const ns=document.getElementById('noise-slider');const ds=document.getElementById('dt-slider');ks.addEventListener('input',e=>{const v=parseFloat(e.target.value);document.getElementById('k-value').textContent=v.toFixed(3);document.getElementById('header-coupling').textContent=v.toFixed(3);this.model.setParameters({K:v})});ss.addEventListener('input',e=>{const v=parseFloat(e.target.value);document.getElementById('sigma-value').textContent=v.toFixed(1)+' Hz';this.model.setParameters({sigma:v})});ns.addEventListener('input',e=>{const v=parseFloat(e.target.value);document.getElementById('noise-value').textContent=v.toFixed(2);this.model.setParameters({noiseLevel:v})});ds.addEventListener('input',e=>{const v=parseFloat(e.target.value);document.getElementById('dt-value').textContent=v.toFixed(3)+'s';this.model.setParameters({dt:v})});document.querySelectorAll('.speed-btn').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');this.playbackSpeed=parseFloat(b.dataset.speed);document.getElementById('speed-display').textContent=this.playbackSpeed+'×';document.getElementById('hud-speed').textContent=this.playbackSpeed+'×';if(this.playbackSpeed<=0.25)this.stepsPerFrame=1;else if(this.playbackSpeed<=0.5)this.stepsPerFrame=2;else if(this.playbackSpeed<=1)this.stepsPerFrame=5;else this.stepsPerFrame=Math.round(5*this.playbackSpeed)})});document.querySelectorAll('.freq-btn').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('.freq-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');const f=parseFloat(b.dataset.freq);const sg=parseFloat(b.dataset.sigma);this.model.setParameters({meanFreq:f,sigma:sg});document.getElementById('header-freq').textContent=f.toFixed(1)+' Hz';ss.value=sg;document.getElementById('sigma-value').textContent=sg.toFixed(1)+' Hz'})});document.querySelectorAll('.network-btn').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('.network-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');this.visualization.setNetwork(b.dataset.network);document.getElementById('hud-network').textContent=b.querySelector('.network-name').textContent.toUpperCase()})});document.getElementById('btn-start').addEventListener('click',()=>{this.isRunning=!this.isRunning;const b=document.getElementById('btn-start');b.textContent=this.isRunning?'❚❚ Halt':'▶ Execute';b.classList.toggle('running',this.isRunning)});document.getElementById('btn-reset').addEventListener('click',()=>{this.model.reset();this.analytics.update();this.analytics.updateRegionList()});const vb=['view-3d','view-top','view-side','view-front'];vb.forEach(id=>{document.getElementById(id).addEventListener('click',()=>{vb.forEach(x=>document.getElementById(x).classList.remove('active'));document.getElementById(id).classList.add('active');if(id!=='view-3d')this.visualization.setView(id.replace('view-',''))})});document.getElementById('toggle-conn').addEventListener('click',e=>{e.target.classList.toggle('active');this.visualization.toggleConnections(e.target.classList.contains('active'))});document.getElementById('toggle-conn').classList.add('active');document.getElementById('toggle-glitch').addEventListener('click',e=>{e.target.classList.toggle('active');this.visualization.toggleGlitch(e.target.classList.contains('active'))})}render(){this.frameCount++;const n=performance.now();if(n-this.lastFpsUpdate>1000){document.getElementById('fps-display').textContent=this.frameCount;this.frameCount=0;this.lastFpsUpdate=n}if(this.isRunning){const es=Math.max(1,Math.round(this.stepsPerFrame*this.playbackSpeed));for(let i=0;i<es;i++)this.model.step();if(this.frameCount%2===0)this.analytics.update();if(this.frameCount%20===0)this.analytics.updateRegionList()}this.visualization.update();requestAnimationFrame(()=>this.render())}}
+
+    window.addEventListener('DOMContentLoaded',()=>new App());
+    </script>
+</body>
+</html>
